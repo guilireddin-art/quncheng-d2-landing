@@ -101,6 +101,7 @@ button,input,select{font-family:inherit}
 .back,.next{border:0;border-radius:14px;padding:15px 12px;font-size:16px;font-weight:900;cursor:pointer}
 .back{width:34%;background:#eef2f7;color:#475569}
 .next{flex:1;background:linear-gradient(100deg,#ffad16,#ff4d0a);color:#fff;box-shadow:0 9px 20px rgba(255,91,12,.24)}
+.next:disabled{cursor:not-allowed;opacity:.52;box-shadow:none;filter:grayscale(.18)}
 .next.green{background:linear-gradient(100deg,#08bcdc,#0758d8)}
 .loading{position:fixed;inset:0;background:rgba(15,23,42,.58);z-index:80;display:none;align-items:center;justify-content:center;padding:24px}
 .loading.show{display:flex}
@@ -176,8 +177,8 @@ body{background:linear-gradient(180deg,#fff4e8,#fffaf3);color:var(--text)}
 .spinner{border-top-color:#ed460d}.result-top{background:linear-gradient(135deg,#f47712,#bd2808)}
 @media (max-width:760px){
   .shell{background:#fff4e7}.top{background:transparent}.brand{color:#37160c}.intro{background:linear-gradient(180deg,#fff3df 0,#fffaf3 88%)}
-  .hero-scene{min-height:490px;background-image:linear-gradient(180deg,rgba(255,244,225,.03) 0,rgba(255,244,225,.1) 57%,#fff3df 98%),url('taipei-warm-mobile.png');background-position:center top}
-  .hero-copy{width:100%;padding-top:92px}.hero-label{color:#52230f}.hero-kicker{width:76%;font-size:43px;line-height:.97;letter-spacing:-.075em;margin-top:24px}.hero-kicker em{display:block;margin:9px 0 0}.hero-title{width:74%;font-size:17px;margin-top:24px;color:#4c1d0b}.hero-amount{width:min(86%,360px);margin-top:17px}.hero-amount strong{font-size:clamp(29px,7.8vw,38px);letter-spacing:-.025em}.calculator{margin-top:-56px}
+  .hero-scene{min-height:465px;background-image:linear-gradient(180deg,rgba(255,244,225,.03) 0,rgba(255,244,225,.1) 57%,#fff3df 98%),url('taipei-warm-mobile.png');background-position:center top}
+  .hero-copy{width:100%;padding-top:100px}.hero-label{display:none}.hero-kicker{width:76%;font-size:43px;line-height:.97;letter-spacing:-.075em;margin-top:10px}.hero-kicker em{display:block;margin:9px 0 0}.hero-title{width:74%;font-size:17px;margin-top:24px;color:#4c1d0b}.hero-amount{width:min(86%,360px);margin-top:17px}.hero-amount strong{font-size:clamp(29px,7.8vw,38px);letter-spacing:-.025em}.calculator{margin-top:-56px}
   .calc-card{background:rgba(255,252,247,.92);box-shadow:0 16px 38px rgba(127,59,10,.17)}
   .shell.form-mode .top,.shell.result-mode .top{background:rgba(255,252,247,.96);border-bottom-color:#edd7bf;box-shadow:0 4px 18px rgba(112,50,8,.08)}
 }
@@ -286,6 +287,7 @@ body{background:linear-gradient(180deg,#fff4e8,#fffaf3);color:var(--text)}
             <p class="form-desc">以下資料只用於初步評估。</p>
             <label class="field-label">銀行是否為警示戶？ *</label>
             <div class="yn" data-group="is_warning"><button class="chip" type="button" data-value="是">是</button><button class="chip" type="button" data-value="否">否</button></div>
+            <div id="warningError" class="error">警示戶目前無法辦理，請先向銀行確認警示戶狀態。</div>
             <label class="field-label">是否有個人外幣帳戶？ *</label>
             <div class="yn" data-group="has_foreign"><button class="chip" type="button" data-value="是">是</button><button class="chip" type="button" data-value="否">否</button></div>
             <label class="field-label">是否有信貸、房貸、汽貸或機貸？ *</label>
@@ -502,6 +504,11 @@ body{background:linear-gradient(180deg,#fff4e8,#fffaf3);color:var(--text)}
         btn.classList.add('selected');
         answers[group.dataset.group] = btn.dataset.value;
         document.getElementById('ynErr').style.display = 'none';
+        if(group.dataset.group === 'is_warning'){
+          const blocked = btn.dataset.value === '是';
+          document.getElementById('warningError').style.display = blocked ? 'block' : 'none';
+          document.getElementById('nextBtn').disabled = blocked;
+        }
       });
     });
   });
@@ -519,12 +526,14 @@ body{background:linear-gradient(180deg,#fff4e8,#fffaf3);color:var(--text)}
     const nextBtn = document.getElementById('nextBtn');
     nextBtn.textContent = currentStep < 3 ? '下一步' : '送出評估申請';
     nextBtn.classList.toggle('green', currentStep === 3);
+    nextBtn.disabled = currentStep === 3 && answers.is_warning === '是';
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function validateStep(){
     document.getElementById('amountErr').style.display = 'none';
     document.getElementById('ynErr').style.display = 'none';
+    document.getElementById('warningError').style.display = 'none';
     document.getElementById('submitErr').style.display = 'none';
     const form = document.getElementById('loanForm');
     if(currentStep === 1){
@@ -546,6 +555,10 @@ body{background:linear-gradient(180deg,#fff4e8,#fffaf3);color:var(--text)}
     const required = ['is_warning','has_foreign','has_loan','has_debt'];
     const ok = required.every(key => answers[key]);
     if(!ok) document.getElementById('ynErr').style.display = 'block';
+    if(answers.is_warning === '是'){
+      document.getElementById('warningError').style.display = 'block';
+      return false;
+    }
     return ok;
   }
 
@@ -565,7 +578,7 @@ body{background:linear-gradient(180deg,#fff4e8,#fffaf3);color:var(--text)}
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
     if(answers.is_warning === '是'){
-      showBlockedResult(String(data.name || '').trim());
+      document.getElementById('warningError').style.display = 'block';
       return;
     }
     const leadId = createLeadId();
